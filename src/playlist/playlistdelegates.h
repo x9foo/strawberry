@@ -58,7 +58,7 @@ class QueuedItemDelegate : public QStyledItemDelegate {
   Q_OBJECT
 
  public:
-  explicit QueuedItemDelegate(QObject *parent, const int indicator_column = static_cast<int>(Playlist::Column::Title));
+  explicit QueuedItemDelegate(QObject *parent, const int indicator_column = Playlist::GetPosition(Playlist::Column::Title));
 
   void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &idx) const override;
   static void DrawBox(QPainter *painter, const QRect line_rect, const QFont &font, const QString &text, int width = -1, const float opacity = 1.0);

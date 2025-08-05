@@ -217,7 +217,7 @@ void PlaylistDelegateBase::paint(QPainter *painter, const QStyleOptionViewItem &
   QueuedItemDelegate::paint(painter, Adjusted(option, idx), idx);
 
   // Stop after indicator
-  if (idx.column() == static_cast<int>(Playlist::Column::Title)) {
+  if (idx.column() == Playlist::GetPosition(Playlist::Column::Title)) {
     if (idx.data(Playlist::Role_StopAfter).toBool()) {
       QRect rect(option.rect);
       rect.setRight(rect.right() - queue_indicator_size(idx));
@@ -260,7 +260,7 @@ bool PlaylistDelegateBase::helpEvent(QHelpEvent *event, QAbstractItemView *view,
   QString text = displayText(idx.data(), QLocale::system());
 
   // Special case: we want newlines in the comment tooltip
-  if (idx.column() == static_cast<int>(Playlist::Column::Comment)) {
+  if (idx.column() == Playlist::GetPosition(Playlist::Column::Comment)) {
     text = idx.data(Qt::ToolTipRole).toString().toHtmlEscaped();
     text.replace("\\r\\n"_L1, "<br />"_L1);
     text.replace("\\n"_L1, "<br />"_L1);

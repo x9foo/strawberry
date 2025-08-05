@@ -50,6 +50,10 @@
 #include "smartplaylists/playlistgenerator_fwd.h"
 #include <streaming/streamingservice.h>
 
+#include <boost/bimap/bimap.hpp>
+
+using namespace boost::bimaps;
+
 class QMimeData;
 class QUndoStack;
 class QTimer;
@@ -101,17 +105,11 @@ class Playlist : public QAbstractListModel {
   // Always add new columns to the end of this enum - the values are persisted
   enum class Column {
     Title = 0,
-    TitleSort,
     Artist,
-    ArtistSort,
     Album,
-    AlbumSort,
     AlbumArtist,
-    AlbumArtistSort,
     Performer,
-    PerformerSort,
     Composer,
-    ComposerSort,
     Year,
     OriginalYear,
     Track,
@@ -138,9 +136,16 @@ class Playlist : public QAbstractListModel {
     HasCUE,
     EBUR128IntegratedLoudness,
     EBUR128LoudnessRange,
+    TitleSort,
+    ArtistSort,
+    AlbumSort,
+    AlbumArtistSort,
+    ComposerSort,
+    PerformerSort,
     ColumnCount
   };
   using Columns = QList<Column>;
+
   static constexpr int ColumnCount = static_cast<int>(Column::ColumnCount);
 
   enum Role {
@@ -285,6 +290,9 @@ class Playlist : public QAbstractListModel {
   void set_auto_sort(const bool auto_sort) { auto_sort_ = auto_sort; }
 
   void ItemReload(const QPersistentModelIndex &idx, const Song &old_metadata, const bool metadata_edit);
+
+  static int GetPosition(Playlist::Column column) { return column_position_bimap_.left.at(column); }
+  static Column GetColumn(int section) { return column_position_bimap_.right.at(section); }
 
  public Q_SLOTS:
   void set_current_row(const int i, const Playlist::AutoScroll autoscroll = Playlist::AutoScroll::Maybe, const bool is_stopping = false, const bool force_inform = false);
@@ -431,6 +439,11 @@ class Playlist : public QAbstractListModel {
   bool auto_sort_;
   Column sort_column_;
   Qt::SortOrder sort_order_;
+
+  using ColumnPositionBimap = bimap<Playlist::Column, int>;
+  using ColumnPosition = ColumnPositionBimap::value_type;
+
+  static const ColumnPositionBimap column_position_bimap_;
 };
 
 #endif  // PLAYLIST_H

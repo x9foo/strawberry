@@ -440,7 +440,7 @@ void PlaylistManager::UpdateSummaryText() {
 
     selected += range.bottom() - range.top() + 1;
     for (int i = range.top(); i <= range.bottom(); ++i) {
-      qint64 length = range.model()->index(i, static_cast<int>(Playlist::Column::Length)).data().toLongLong();
+      qint64 length = range.model()->index(i, Playlist::GetPosition(Playlist::Column::Length)).data().toLongLong();
       if (length > 0) {
         nanoseconds += length;
       }

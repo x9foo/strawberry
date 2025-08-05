@@ -44,7 +44,7 @@ void PlaylistProxyStyle::drawControl(ControlElement element, const QStyleOption 
 
     // Spaces added to make transition less abrupt
     if (rect.width() < font_metrics.horizontalAdvance(text + u"  "_s)) {
-      const Playlist::Column column = static_cast<Playlist::Column>(header_option->section);
+      const Playlist::Column column = Playlist::GetColumn(header_option->section);
       QStyleOptionHeader new_option(*header_option);
       new_option.text = Playlist::abbreviated_column_name(column);
       QProxyStyle::drawControl(element, &new_option, painter, widget);

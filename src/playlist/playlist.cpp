@@ -208,7 +208,7 @@ QVariant Playlist::headerData(const int section, Qt::Orientation orientation, co
 
   if (role != Qt::DisplayRole && role != Qt::ToolTipRole) return QVariant();
 
-  const QString name = column_name(static_cast<Playlist::Column>(section));
+  const QString name = column_name(Playlist::GetColumn(section));
   if (!name.isEmpty()) return name;
 
   return QVariant();
@@ -332,7 +332,7 @@ QVariant Playlist::data(const QModelIndex &idx, const int role) const {
       return queue_->PositionOf(idx);
 
     case Role_CanSetRating:
-      return static_cast<Column>(idx.column()) == Column::Rating && items_[idx.row()]->IsLocalCollectionItem() && items_[idx.row()]->EffectiveMetadata().id() != -1;
+      return Playlist::GetColumn(idx.column()) == Column::Rating && items_[idx.row()]->IsLocalCollectionItem() && items_[idx.row()]->EffectiveMetadata().id() != -1;
 
     case Qt::EditRole:
     case Qt::ToolTipRole:
@@ -341,7 +341,7 @@ QVariant Playlist::data(const QModelIndex &idx, const int role) const {
       const Song song = item->EffectiveMetadata();
 
       // Don't forget to change Playlist::CompareItems when adding new columns
-      switch (static_cast<Column>(idx.column())) {
+      switch (Playlist::GetColumn(idx.column())) {
         case Column::Title:              return song.PrettyTitle();
         case Column::TitleSort:          return song.titlesort();
         case Column::Artist:             return song.artist();
@@ -445,7 +445,7 @@ QVariant Playlist::data(const QModelIndex &idx, const int role) const {
 
 #ifdef HAVE_MOODBAR
 void Playlist::MoodbarUpdated(const QModelIndex &idx) {
-  Q_EMIT dataChanged(idx.sibling(idx.row(), static_cast<int>(Column::Mood)), idx.sibling(idx.row(), static_cast<int>(Column::Mood)));
+  Q_EMIT dataChanged(idx.sibling(idx.row(), Playlist::GetPosition(Column::Mood)), idx.sibling(idx.row(), Playlist::GetPosition(Column::Mood)));
 }
 #endif
 
@@ -459,7 +459,7 @@ bool Playlist::setData(const QModelIndex &idx, const QVariant &value, const int 
 
   if (idx.data() == value) return false;
 
-  if (!set_column_value(song, static_cast<Column>(idx.column()), value)) return false;
+  if (!set_column_value(song, GetColumn(idx.column()), value)) return false;
 
   if (song.url().isLocalFile()) {
     TagReaderReplyPtr reply = tagreader_client_->WriteFileAsync(song.url().toLocalFile(), song);
@@ -818,7 +818,7 @@ Qt::ItemFlags Playlist::flags(const QModelIndex &idx) const {
 
   if (idx.isValid()) {
     Qt::ItemFlags flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsDragEnabled;
-    if (item_at(idx.row())->EffectiveMetadata().IsEditable() && column_is_editable(static_cast<Column>(idx.column()))) flags |= Qt::ItemIsEditable;
+    if (item_at(idx.row())->EffectiveMetadata().IsEditable() && column_is_editable(Playlist::GetColumn(idx.column()))) flags |= Qt::ItemIsEditable;
     return flags;
   }
 
@@ -1192,7 +1192,7 @@ void Playlist::InsertItemsWithoutUndo(const PlaylistItemPtrList &items, const in
   }
 
   if (auto_sort_) {
-    sort(static_cast<int>(sort_column_), sort_order_);
+    sort(Playlist::GetPosition(sort_column_), sort_order_);
   }
 
   ReshuffleIndices();
@@ -1485,9 +1485,11 @@ QString Playlist::abbreviated_column_name(const Column column) {
 
 void Playlist::sort(const int column_number, const Qt::SortOrder order) {
 
-  const Column column = static_cast<Column>(column_number);
+  qLog(Debug) << "sort::column_number " << column_number;
 
-  sort_column_ = static_cast<Column>(column);
+  const Column column = Playlist::GetColumn(column_number);
+
+  sort_column_ = column;
   sort_order_ = order;
 
   if (ignore_sorting_) return;
@@ -2110,7 +2112,7 @@ void Playlist::TracksAboutToBeDequeued(const QModelIndex &idx, const int begin, 
   Q_UNUSED(idx)
 
   for (int i = begin; i <= end; ++i) {
-    temp_dequeue_change_indexes_ << queue_->mapToSource(queue_->index(i, static_cast<int>(Column::Title)));
+    temp_dequeue_change_indexes_ << queue_->mapToSource(queue_->index(i, Playlist::GetPosition(Column::Title)));
   }
 
 }
@@ -2129,8 +2131,8 @@ void Playlist::TracksEnqueued(const QModelIndex &parent_idx, const int begin, co
 
   Q_UNUSED(parent_idx)
 
-  const QModelIndex &b = queue_->mapToSource(queue_->index(begin, static_cast<int>(Column::Title)));
-  const QModelIndex &e = queue_->mapToSource(queue_->index(end, static_cast<int>(Column::Title)));
+  const QModelIndex &b = queue_->mapToSource(queue_->index(begin, Playlist::GetPosition(Column::Title)));
+  const QModelIndex &e = queue_->mapToSource(queue_->index(end, Playlist::GetPosition(Column::Title)));
   Q_EMIT dataChanged(b, e);
 
 }
@@ -2138,7 +2140,7 @@ void Playlist::TracksEnqueued(const QModelIndex &parent_idx, const int begin, co
 void Playlist::QueueLayoutChanged() {
 
   for (int i = 0; i < queue_->rowCount(); ++i) {
-    const QModelIndex idx = queue_->mapToSource(queue_->index(i, static_cast<int>(Column::Title)));
+    const QModelIndex idx = queue_->mapToSource(queue_->index(i, Playlist::GetPosition(Column::Title)));
     Q_EMIT dataChanged(idx, idx);
   }
 
@@ -2325,7 +2327,7 @@ void Playlist::RowDataChanged(const int row, const Columns &columns) {
   }
   else {
     for (const Column &column : columns) {
-      const QModelIndex idx = index(row, static_cast<int>(column));
+      const QModelIndex idx = index(row, Playlist::GetPosition(column));
       if (idx.isValid()) {
         Q_EMIT dataChanged(idx, idx);
       }
@@ -2588,3 +2590,52 @@ void Playlist::RateSongs(const QModelIndexList &index_list, const float rating) 
   collection_backend_->UpdateSongsRatingAsync(id_list, rating);
 
 }
+
+const Playlist::ColumnPositionBimap Playlist::column_position_bimap_ = [] {
+
+  Playlist::ColumnPositionBimap cpb;
+  int i = 0;
+  cpb.insert(ColumnPosition(Playlist::Column::Album, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::AlbumArtist, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::AlbumArtistSort, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::AlbumSort, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::Artist, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::ArtistSort, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::BaseFilename, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::Bitdepth, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::Bitrate, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::Comment, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::Composer, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::ComposerSort, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::DateCreated, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::DateModified, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::Disc, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::EBUR128IntegratedLoudness, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::EBUR128LoudnessRange, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::Filesize, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::Filetype, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::Genre, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::Grouping, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::HasCUE, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::LastPlayed, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::Length, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::Mood, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::OriginalYear, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::Performer, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::PerformerSort, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::PlayCount, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::Rating, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::Samplerate, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::SkipCount, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::Source, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::Title, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::TitleSort, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::Track, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::URL, i++));
+  cpb.insert(ColumnPosition(Playlist::Column::Year, i++));
+
+  Q_ASSERT(i == Playlist::ColumnCount);
+
+  return cpb;
+
+}();
